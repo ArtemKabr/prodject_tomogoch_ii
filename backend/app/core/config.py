@@ -47,6 +47,21 @@ class Settings(BaseSettings):
         alias="AUTO_MEMORY_ENABLED",
     )
 
+    # === Rate limit (chat) ===  # (я добавил)
+    rate_limit_enabled: bool = Field(  # (я добавил)
+        default=True,
+        alias="RATE_LIMIT_ENABLED",
+    )  # (я добавил)
+
+    rate_limit_requests: int = Field(  # (я добавил)
+        default=20,
+        alias="RATE_LIMIT_REQUESTS",
+    )  # (я добавил)
+
+    rate_limit_window_s: int = Field(  # (я добавил)
+        default=60,
+        alias="RATE_LIMIT_WINDOW_S",
+    )  # (я добавил)
 
 
 settings = Settings()

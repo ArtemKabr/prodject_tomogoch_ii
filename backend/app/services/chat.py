@@ -4,14 +4,18 @@
 """
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, func  # (я добавил)
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings  # (я добавил)
 from app.models.conversation import Conversation, Message, MessageRole
 from app.models.pet import Pet
 from app.services.ollama_client import ollama_chat  # (я добавил)
-from app.services.memory import get_top_memories_texts
+from app.services.memory import (  # (я добавил)
+    MemoryLimitExceeded,  # (я добавил)
+    get_top_memories_texts,
+    upsert_memory_from_chat,  # (я добавил)
+)
 from app.services.pet_rules import apply_action_from_user_message, apply_passive_degradation
 
 
@@ -57,13 +61,16 @@ async def send_message(
     # сохраняем сообщение пользователя  # (я добавил)
     db.add(Message(conversation_id=conv.id, role=MessageRole.user.value, text=user_text))  # (я добавил)
 
-    normalized = user_text.strip()  # (я добавил)
+    normalized = (user_text or "").strip()  # (я добавил)
     low = normalized.lower()  # (я добавил)
+
+    if not normalized:  # (я добавил)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Empty message")  # (я добавил)
 
     if settings.auto_memory_enabled:  # (я добавил)
         # === автосохранение памяти из обычной речи (без команды) ===  # (я добавил)
         if not (low.startswith("запомни:") or low.startswith("запомни ")):  # (я добавил)
-            from app.models.memory import Memory  # (я добавил)
+            # from app.models.memory import Memory  # (старое оставил)  # (я добавил)
 
             preference_prefixes = (  # (я добавил)
                 "я люблю",  # (я добавил)
@@ -95,30 +102,33 @@ async def send_message(
             if mem_type is not None:  # (я добавил)
                 payload_text = normalized[:200].strip()  # (я добавил)
                 payload_text_clean = " ".join(payload_text.split()).strip()  # (я добавил)
-                payload_text_key = payload_text_clean.lower()  # (я добавил)
 
-                exists_mem = (await db.execute(  # (я добавил)
-                    select(Memory.id).where(
-                        Memory.user_id == user_id,
-                        Memory.type == mem_type,  # (я добавил)
-                        func.lower(Memory.text) == payload_text_key,  # (я добавил)
-                    )
-                )).scalar_one_or_none()  # (я добавил)
+                # exists_mem = (await db.execute(  # (старое оставил)  # (я добавил)
+                #     select(Memory.id).where(
+                #         Memory.user_id == user_id,
+                #         Memory.type == mem_type,
+                #         func.lower(Memory.text) == payload_text_clean.lower(),
+                #     )
+                # )).scalar_one_or_none()
 
-                if exists_mem is None:  # (я добавил)
-                    db.add(  # (я добавил)
-                        Memory(
-                            user_id=user_id,
-                            type=mem_type,  # (я добавил)
-                            text=payload_text_clean,  # (я добавил)
-                            importance=importance,  # (я добавил)
-                        )
+                # if exists_mem is None:
+                #     db.add(Memory(...))
+                #     await db.flush()
+
+                try:  # (я добавил)
+                    await upsert_memory_from_chat(  # (я добавил)
+                        db,
+                        user_id=user_id,
+                        type_=mem_type,
+                        text=payload_text_clean,
+                        importance=importance,
                     )
-                    await db.flush()  # (я добавил)
+                except MemoryLimitExceeded:  # (я добавил)
+                    pass  # (я добавил)
 
         # === автосохранение памяти по триггеру "запомни" ===  # (я добавил)
         if low.startswith("запомни:") or low.startswith("запомни "):  # (я добавил)
-            from app.models.memory import Memory  # (я добавил)
+            # from app.models.memory import Memory  # (старое оставил)  # (я добавил)
 
             payload_text = (  # (я добавил)
                 normalized.split(":", 1)[1].strip()
@@ -157,29 +167,32 @@ async def send_message(
                     mem_type = "profile"  # (я добавил)
 
                 payload_text_clean = " ".join(payload_text.split()).strip()  # (я добавил)
-                payload_text_key = payload_text_clean.lower()  # (я добавил)
 
-                exists_mem = (await db.execute(  # (я добавил)
-                    select(Memory.id).where(
-                        Memory.user_id == user_id,
-                        Memory.type == mem_type,  # (я добавил)
-                        func.lower(Memory.text) == payload_text_key,  # (я добавил)
-                    )
-                )).scalar_one_or_none()  # (я добавил)
+                # exists_mem = (await db.execute(  # (старое оставил)  # (я добавил)
+                #     select(Memory.id).where(
+                #         Memory.user_id == user_id,
+                #         Memory.type == mem_type,
+                #         func.lower(Memory.text) == payload_text_clean.lower(),
+                #     )
+                # )).scalar_one_or_none()
+                #
+                # if exists_mem is None:
+                #     db.add(Memory(...))
+                #     await db.flush()
 
-                if exists_mem is None:  # (я добавил)
-                    db.add(  # (я добавил)
-                        Memory(
-                            user_id=user_id,
-                            type=mem_type,  # (я добавил)
-                            text=payload_text_clean,  # (я добавил)
-                            importance=importance,  # (я добавил)
-                        )
+                try:  # (я добавил)
+                    await upsert_memory_from_chat(  # (я добавил)
+                        db,
+                        user_id=user_id,
+                        type_=mem_type,
+                        text=payload_text_clean[:200],
+                        importance=importance,
                     )
-                    await db.flush()  # (я добавил)
+                except MemoryLimitExceeded:  # (я добавил)
+                    pass  # (я добавил)
 
     # применяем влияние действия пользователя на питомца  # (я добавил)
-    apply_action_from_user_message(pet)  # (я добавил)
+    apply_action_from_user_message(pet, user_text=user_text)  # (я добавил)
 
     # получаем актуальную память (уже с учётом возможного добавления)  # (я добавил)
     mem_texts = await get_top_memories_texts(db, user_id, limit=10)

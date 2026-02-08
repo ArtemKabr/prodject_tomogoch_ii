@@ -12,13 +12,17 @@ from app.api.memory import router as memory_router
 from app.api.pet import router as pet_router
 from app.core.config import settings
 from app.db.init_db import init_db  # (я добавил)
+from app.middlewares.rate_limit import RateLimitMiddleware  # (я добавил)
 
 app = FastAPI(title=settings.app_name)
+
+# rate limit для /api/v1/chat  # (я добавил)
+app.add_middleware(RateLimitMiddleware)  # (я добавил)
 
 
 @app.on_event("startup")
 async def _startup() -> None:
-    """Инициализация схемы БД для MVP (create_all)."""  # (я добавил)
+    """Инициализация схемы БД для MVP (create_all)."""
     await init_db()  # (я добавил)
 
 

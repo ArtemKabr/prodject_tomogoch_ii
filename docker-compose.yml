@@ -1,4 +1,4 @@
-# prodject_tomogoch_II/docker-compose.yml — поднятие backend + postgres  # (я добавил)
+# prodject_tomogoch_II/docker-compose.yml — поднятие backend + postgres + frontend  # (я добавил)
 
 services:
   db:
@@ -35,6 +35,21 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"  # (я добавил)
     command: ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  frontend: # (я добавил)
+    build: # (я добавил)
+      context: ./frontend # (я добавил)
+      dockerfile: Dockerfile # (я добавил)
+    container_name: tamagochi_frontend # (я добавил)
+    ports: # (я добавил)
+      - "5173:5173" # (я добавил)
+    environment: # (я добавил)
+      - VITE_API_BASE_URL=http://localhost:8000 # (я добавил)
+    volumes: # (я добавил)
+      - ./frontend:/app # (я добавил)
+      - /app/node_modules # (я добавил)
+    depends_on: # (я добавил)
+      - backend # (я добавил)
 
 volumes:
   db_data:
