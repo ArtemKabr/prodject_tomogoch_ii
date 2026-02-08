@@ -51,7 +51,10 @@ async def history(
     stmt = (
         select(Message)
         .join(Message.conversation)
-        .where(Message.conversation_id == conversation_id)
+        .where(
+            Message.conversation_id == conversation_id,
+            Message.conversation.has(user_id=user.id),  # (я добавил)
+        )
         .limit(limit)
         .offset(offset)
         .order_by(Message.created_at.asc())
