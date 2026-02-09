@@ -1,47 +1,44 @@
-# backend/app/models/pet.py — модель питомца
-"""
-Pets: параметры 0..100, стадия, жизнь/смерть.
-"""
+# backend/app/models/pet.py
 
 from datetime import datetime
-from enum import StrEnum
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, JSON
+from sqlalchemy.orm import Mapped, mapped_column
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.base import Base
-
-
-class AgeStage(StrEnum):
-    """Стадии развития питомца."""
-
-    baby = "baby"
-    teen = "teen"
-    adult = "adult"
-    mentor = "mentor"
-
+from app.db.base_class import Base
 
 class Pet(Base):
-    """Питомец пользователя (активный/архив)."""
+    __tablename__ = "pet"
 
-    __tablename__ = "pets"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, default="Petya")
+    age_stage: Mapped[str] = mapped_column(String, default="egg")
+    is_alive: Mapped[bool] = mapped_column(default=True)
 
-    age_stage: Mapped[str] = mapped_column(String(16), default=AgeStage.baby.value, nullable=False)
+    health: Mapped[float] = mapped_column(Float, default=100.0)
+    energy: Mapped[float] = mapped_column(Float, default=100.0)
+    mood: Mapped[float] = mapped_column(Float, default=100.0)
+    intellect: Mapped[float] = mapped_column(Float, default=0.0)
+    bond: Mapped[float] = mapped_column(Float, default=0.0)
 
-    health: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
-    energy: Mapped[int] = mapped_column(Integer, default=80, nullable=False)
-    mood: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
-    intellect: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    bond: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_active_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    is_alive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Фаза 1
+    last_feed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_walk_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_play_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_train_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_sleep_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_action_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    last_active_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    died_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    user = relationship("User", back_populates="pets")  # (я добавил)
-    conversations = relationship("Conversation", back_populates="pet")  # (я добавил)
+    sleep_debt: Mapped[float] = mapped_column(Float, default=0.0)
+    hunger_debt: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # Фаза 5
+    personality_type: Mapped[str] = mapped_column(String, nullable=True) # e.g., "intellectual", "active"
+    daily_quests: Mapped[dict] = mapped_column(JSON, default=lambda: {})
+    streaks: Mapped[dict] = mapped_column(JSON, default=lambda: {"login": 0, "quest_completion": 0})
+    last_quest_completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
