@@ -3,14 +3,14 @@
 /memory list/add/delete
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status  # (я добавил)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.models.memory import Memory
 from app.models.user import User
 from app.schemas.memory import MemoryIn, MemoryOut
-from app.services.memory import add_memory, delete_memory, list_memories
+from app.services.memory import MemoryLimitExceeded, add_memory, delete_memory, list_memories  # (я добавил)
 
 router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
 
@@ -24,7 +24,10 @@ async def get_all(user: User = Depends(get_current_user), db: AsyncSession = Dep
 @router.post("", response_model=MemoryOut, status_code=201)
 async def add(payload: MemoryIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> MemoryOut:
     mem = Memory(user_id=user.id, type=payload.type, text=payload.text, importance=payload.importance)
-    mem = await add_memory(db, mem)
+    try:  # (я добавил)
+        mem = await add_memory(db, mem)
+    except MemoryLimitExceeded:  # (я добавил)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Memory limit exceeded")  # (я добавил)
     return MemoryOut.model_validate(mem, from_attributes=True)
 
 

@@ -11,6 +11,12 @@ export type ChatOut = {
   pet_state: PetOut;
 };
 
+export type HistoryItem = { // (я добавил)
+  role: "user" | "assistant"; // (я добавил)
+  text: string; // (я добавил)
+  created_at: string; // (я добавил)
+}; // (я добавил)
+
 export function chatSend(message: string, conversation_id?: number): Promise<ChatOut> {
   return apiFetch<ChatOut>("/api/v1/chat", {
     method: "POST",
@@ -18,11 +24,15 @@ export function chatSend(message: string, conversation_id?: number): Promise<Cha
   });
 }
 
-export function chatHistory(conversation_id: number, limit = 50, offset = 0): Promise<{ items: any[] }> {
+export function chatHistory( // (я добавил)
+  conversation_id: number, // (я добавил)
+  limit = 50, // (я добавил)
+  offset = 0, // (я добавил)
+): Promise<{ items: HistoryItem[] }> { // (я добавил)
   const qs = new URLSearchParams({
     conversation_id: String(conversation_id),
     limit: String(limit),
     offset: String(offset),
   });
-  return apiFetch<{ items: any[] }>(`/api/v1/chat/history?${qs.toString()}`);
+  return apiFetch<{ items: HistoryItem[] }>(`/api/v1/chat/history?${qs.toString()}`); // (я добавил)
 }

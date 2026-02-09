@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.pet import Pet
 from app.services.pet_rules import apply_passive_degradation
+from app.services.pet_rules import apply_action  # (я добавил)
+
 
 
 async def get_alive_pet(db: AsyncSession, user_id: str) -> Pet | None:
@@ -56,3 +58,21 @@ async def revive_pet(db: AsyncSession, user_id: str) -> Pet:
     await db.commit()
     await db.refresh(pet)
     return pet
+
+
+async def perform_pet_action(db: AsyncSession, *, user_id: str, action: str) -> tuple[Pet, str, str, list[str]]:  # (я добавил)
+    """Выполнить действие питомца и вернуть (pet, message, time_of_day, available_actions)."""  # (я добавил)
+    pet = await get_alive_pet(db, user_id)  # (я добавил)
+    if pet is None:  # (я добавил)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pet not found")  # (я добавил)
+
+    apply_passive_degradation(pet)  # (я добавил)
+    if not pet.is_alive:  # (я добавил)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Pet is dead")  # (я добавил)
+
+    res = apply_action(pet=pet, action=action)  # (я добавил)
+
+    await db.commit()  # (я добавил)
+    await db.refresh(pet)  # (я добавил)
+
+    return pet, res.message, res.time_of_day, res.available_actions  # (я добавил)
